@@ -1154,11 +1154,14 @@ export function filterSidebarProjectScopeItems<TItem extends { readonly value: s
 interface SidebarProjectScopeMenuState {
   readonly open: boolean;
   readonly query: string;
+  readonly highlightAll: boolean;
 }
 
 type SidebarProjectScopeMenuAction =
   | { readonly type: "query-changed"; readonly query: string }
   | { readonly type: "open-changed"; readonly open: boolean }
+  | { readonly type: "shortcut-pressed" }
+  | { readonly type: "shortcut-opened" }
   | { readonly type: "project-settings-opened" };
 
 export function reduceSidebarProjectScopeMenuState(
@@ -1169,9 +1172,13 @@ export function reduceSidebarProjectScopeMenuState(
     case "query-changed":
       return { ...state, query: action.query };
     case "open-changed":
-      return { open: action.open, query: "" };
+      return { open: action.open, query: "", highlightAll: false };
+    case "shortcut-pressed":
+      return { ...state, highlightAll: true };
+    case "shortcut-opened":
+      return { open: true, query: "", highlightAll: true };
     case "project-settings-opened":
-      return { open: false, query: "" };
+      return { open: false, query: "", highlightAll: false };
   }
 }
 

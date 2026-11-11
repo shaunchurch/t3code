@@ -233,6 +233,11 @@ On mobile, the thread list search also lists message matches and opens them at
 the matching message; on an iPad with a keyboard, `Cmd+K` opens the same
 palette.
 
+To narrow the sidebar to one project from the keyboard, bind **Sidebar: Filter
+Projects** in **Settings → Keybindings**. It has no default shortcut. Press it,
+type part of a project name, and press Enter. Press it again, then Enter, to
+show all projects.
+
 Use **Settings → Keybindings** to find or customize shortcuts for searching files
 and copying a thread reference. A copied reference uses the thread's pull request
 link when available, otherwise a link to the thread, which opens it from anywhere

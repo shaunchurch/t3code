@@ -80,6 +80,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
+import { flushSync } from "react-dom";
 import { type AnyRouter, useRouter } from "@tanstack/react-router";
 
 import {
@@ -127,6 +128,7 @@ import { useProjectPin } from "../hooks/useProjectGroupUpdate";
 import { useSidebarProjectGroups } from "../hooks/useSidebarProjectGroups";
 import { isCommandPaletteOpen, openCommandPalette } from "../commandPaletteBus";
 import { registerSettleAndAdvance } from "../settleAndAdvance";
+import { registerCommands, registerMenuAction } from "../shortcuts/dispatcher";
 import { startNewThreadFromContext } from "../lib/chatThreadActions";
 import { useClientSettings } from "../hooks/useSettings";
 import { useCopyToClipboard } from "../hooks/useCopyToClipboard";
@@ -910,7 +912,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   } = useSidebarLookups();
   const delegatedUnderParent = useDelegatedUnderParent();
   const router = useRouter();
-  const { isMobile, setOpenMobile } = useSidebar();
+  const { isMobile, setOpen: setSidebarOpen, setOpenMobile } = useSidebar();
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
   const confirmThreadDelete = useClientSettings((s) => s.confirmThreadDelete);
   const confirmThreadArchive = useClientSettings((s) => s.confirmThreadArchive);
@@ -1011,7 +1013,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   const setPersistedProjectScopeKeys = useUiStateStore((store) => store.setSidebarProjectScopeKeys);
   const [projectScopeMenuState, dispatchProjectScopeMenu] = useReducer(
     reduceSidebarProjectScopeMenuState,
-    { open: false, query: "" },
+    { open: false, query: "", highlightAll: false },
   );
   const projectScopeFilter = useComboboxFilter();
   const allProjectSnapshotsReady = useAllEnvironmentProjectSnapshotsReady();
@@ -1155,6 +1157,37 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     clearSelection();
     setPersistedProjectScopeKeys([]);
   }, [clearSelection, revealWidensScope, setPersistedProjectScopeKeys]);
+  const projectScopeMenuOpen = projectScopeMenuState.open;
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- registers the project filter shortcut with the global keyboard dispatcher and desktop menu actions
+  useEffect(() => {
+    const toggleProjectFilter = () => {
+      if (projectScopeMenuOpen) {
+        dispatchProjectScopeMenu({ type: "open-changed", open: false });
+        return;
+      }
+      if (!isMobile) setSidebarOpen(true);
+      // Base UI syncs the highlighted selection only while closed, so commit "All projects" first.
+      flushSync(() => dispatchProjectScopeMenu({ type: "shortcut-pressed" }));
+      dispatchProjectScopeMenu({ type: "shortcut-opened" });
+    };
+    const disposers = [
+      registerCommands({
+        "sidebar.filterProjects": (event) => {
+          if (projectGroupsRef.current.length === 0) return false;
+          event.preventDefault();
+          event.stopPropagation();
+          toggleProjectFilter();
+        },
+      }),
+      // A focused desktop preview forwards the chord as a menu action.
+      registerMenuAction("sidebar.filterProjects", () => {
+        if (projectGroupsRef.current.length > 0) toggleProjectFilter();
+      }),
+    ];
+    return () => {
+      for (const dispose of disposers) dispose();
+    };
+  }, [isMobile, projectScopeMenuOpen, setSidebarOpen]);
   const revealActiveRow = useActiveRowReveal(routeReveal, routeRowThreadKey);
   const showProjectEnvironments = projectGroupsSpanEnvironments(projectGroups);
   const scratchMachineLabelFor = (
@@ -1176,8 +1209,9 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     (item) => item.value,
     projectScopeMenuState.open,
   );
-  const selectedProjectScopeItem =
-    projectScopeKeys.length > 1
+  const selectedProjectScopeItem = projectScopeMenuState.highlightAll
+    ? projectScopeItems[0]!
+    : projectScopeKeys.length > 1
       ? null
       : (projectScopeItems.find((item) => item.value === (projectScopeKeys[0] ?? "all")) ??
         projectScopeItems[0]!);
